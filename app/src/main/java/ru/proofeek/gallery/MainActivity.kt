@@ -15,9 +15,14 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.navigation.NavController
+import androidx.navigation.findNavController
+import kotlinx.android.synthetic.main.fragment_home2.view.*
+import ru.proofeek.gallery.databinding.ActivityMainBinding
 import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
@@ -28,59 +33,72 @@ class MainActivity : AppCompatActivity() {
 
     val IMAGE_ERQUEST_CODE = 100
 
-    private lateinit var button: Button
-    private lateinit var imageView: ImageView
-    private lateinit var path2: String
+    lateinit var binding: ActivityMainBinding
+    var timer: CountDownTimer? = null
+    private val dataModel: DataModel by viewModels()
+    var time: Long = 10000
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
 
         supportActionBar?.hide()
         checkPermission()
-        button = findViewById(R.id.button)
-        imageView = findViewById(R.id.imageView)
+/*
+        supportFragmentManager
+            .beginTransaction()
+            .replace(R.id.main_fragment, HomeFragment() )
+            .commit()
+*/
 
-        button.setOnClickListener{
-            dirRequest.launch(null)
+        dataModel.imageDuration.observe(this){
+            time = it.toLong() * 1000
         }
 
 
 
     }
 
-    fun setButtonEnabled(bool: Boolean){
-        button.isEnabled = bool
-        button.isClickable = bool
+    override fun onSupportNavigateUp(): Boolean {
+        val navController = findNavController(R.id.main_fragment)
+        return navController.navigateUp() || super.onSupportNavigateUp()
     }
+
+    fun setButtonEnabled(bool: Boolean){
+        binding.mainFragment.buttonIm.isEnabled = bool
+        binding.mainFragment.buttonIm.isClickable = bool
+    }
+
+
+
 
     fun imagesToScreen(imagesList: ArrayList<File>){
 
         setButtonEnabled(false)
         var step = 0
-            //Log.e("fger", file.path)
-            val timer = object: CountDownTimer(1000, 1000) {
+            Log.e("СЕКУНДЫ", (time/1000).toString())
+            timer?.cancel()
+            timer = object : CountDownTimer(time, time) {
                 override fun onTick(p0: Long) {
-                }
-                override fun onFinish() {
                     val bitmap = BitmapFactory.decodeFile(imagesList[step].path)
-                    imageView.setImageBitmap(bitmap)
+                    binding.mainFragment.imageView.setImageBitmap(bitmap)
                     Log.e("Number", step.toString())
                     if(step + 1 >= imagesList.size) step = 0 else step++
+                }
+                override fun onFinish() {
                     this.start()
                 }
-            }.start().onFinish()
+            }.start()
 
 
             Log.e("LOLOLP", "p1")
-
     }
 
 
-    private val dirRequest = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+    val dirRequest = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let {
             // call this to persist permission across decice reboots
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
