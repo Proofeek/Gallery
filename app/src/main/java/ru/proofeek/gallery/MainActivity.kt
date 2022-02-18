@@ -1,5 +1,6 @@
 package ru.proofeek.gallery
 
+import android.app.Activity
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,21 +12,18 @@ import android.os.CountDownTimer
 import android.provider.Settings
 import android.util.Log
 import android.webkit.MimeTypeMap
-import android.widget.Button
-import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.navigation.NavController
 import androidx.navigation.findNavController
+import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.fragment_home2.view.*
 import ru.proofeek.gallery.databinding.ActivityMainBinding
 import java.io.File
 import java.util.*
-import kotlin.collections.ArrayList
 
 
 class MainActivity : AppCompatActivity() {
@@ -37,6 +35,7 @@ class MainActivity : AppCompatActivity() {
     var timer: CountDownTimer? = null
     private val dataModel: DataModel by viewModels()
     var time: Long = 10000
+    private var rightNow: Calendar = Calendar.getInstance()
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,8 +57,7 @@ class MainActivity : AppCompatActivity() {
             time = it.toLong() * 1000
         }
 
-
-
+        //Log.e("CurrentTime","${currentHour}:${currentMinute}")
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -72,12 +70,67 @@ class MainActivity : AppCompatActivity() {
         binding.mainFragment.buttonIm.isClickable = bool
     }
 
+    fun currentHour():Int{
+        rightNow = Calendar.getInstance()
+        return rightNow.get(Calendar.HOUR_OF_DAY)
+    }
+    fun currentMinute():Int{
+        rightNow = Calendar.getInstance()
+        return rightNow.get(Calendar.MINUTE)
+    }
 
+    fun isTimeFunctionsOn(imagesList: ArrayList<File>){
+        setButtonEnabled(false)
+        val timePickerOnHour = dataModel.timePickerHourOn.value
+        val timePickerOnMinute = dataModel.timePickerMinuteOn.value
+        val timePickerOffHour = dataModel.timePickerHourOff.value
+        val timePickerOffMinute = dataModel.timePickerMinuteOff.value
+
+        var isStarted = false
+        if(dataModel.isTimeOn.value == true){
+            textViewTime.text ="Изображения появятся\nв ${dataModel.timePickerHourOn.value}:${dataModel.timePickerMinuteOn.value}"
+            object : CountDownTimer(1000, 1000) {
+                override fun onTick(p0: Long) {
+                    Log.e("ПУК", "${currentHour()}:${currentMinute()} -- ${dataModel.timePickerHourOn.value}:${dataModel.timePickerMinuteOn.value}")
+                    if(timePickerOnHour == currentHour() && timePickerOnMinute == currentMinute()){
+                        imagesToScreen(imagesList)
+                        isStarted = true
+                        this.cancel()
+                    }
+                }
+                override fun onFinish() {
+                    this.start()
+                }
+            }.start()
+        }else{
+            imagesToScreen(imagesList)
+        }
+
+        if(dataModel.isTimeOff.value == true){
+            textViewTime.text ="${textViewTime.text}\nи исчезнут в ${dataModel.timePickerHourOff.value}:${dataModel.timePickerMinuteOff.value}"
+            object : CountDownTimer(1000, 1000) {
+                override fun onTick(p0: Long) {
+                    if(timePickerOffHour == currentHour() && timePickerOffMinute == currentMinute() && isStarted){
+                        timer?.cancel()
+                        recreateActivity()
+                        this.cancel()
+                    }
+                }
+                override fun onFinish() {
+                    this.start()
+                }
+            }.start()
+        }
+    }
+
+    fun recreateActivity(){
+        this.recreate()
+    }
 
 
     fun imagesToScreen(imagesList: ArrayList<File>){
+        textViewTime.text =""
 
-        setButtonEnabled(false)
         var step = 0
             Log.e("СЕКУНДЫ", (time/1000).toString())
             timer?.cancel()
@@ -135,7 +188,7 @@ class MainActivity : AppCompatActivity() {
             }
             Log.w("fileList", "" + fileList.size)
             Toast.makeText(this, "Выбрано ${fileList.size.toString()} изображений", Toast.LENGTH_SHORT).show()
-            imagesToScreen(fileList)
+            isTimeFunctionsOn(fileList)
         }
         else{
             Log.e("AGA", "NO FILES")
