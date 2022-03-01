@@ -1,27 +1,27 @@
 package ru.proofeek.gallery
 
+import android.Manifest.permission.READ_EXTERNAL_STORAGE
+import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+import android.annotation.SuppressLint
 import android.app.job.JobInfo
 import android.app.job.JobScheduler
 import android.content.ComponentName
-import android.content.DialogInterface
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.BatteryManager
-import android.os.Build
-import android.os.Bundle
-import android.os.CountDownTimer
+import android.os.*
+import android.os.Build.VERSION.SDK_INT
 import android.provider.Settings
 import android.util.Log
 import android.webkit.MimeTypeMap
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.navigation.findNavController
 import androidx.preference.PreferenceManager
 import kotlinx.android.synthetic.main.activity_main.*
@@ -46,6 +46,8 @@ class MainActivity : AppCompatActivity() {
     private var rightNow: Calendar = Calendar.getInstance()
     var sp: SharedPreferences? = null
     var bm: BatteryManager? = null
+    var permissions =
+        arrayOf("android.permission.WRITE_EXTERNAL_STORAGE", "android.permission.READ_EXTERNAL_STORAGE","android.permission.MANAGE_EXTERNAL_STORAGE")
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +56,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         supportActionBar?.hide()
-        checkPermission()
+        if (!checkPermission()) requestPermission()
 
         sp = PreferenceManager.getDefaultSharedPreferences(this)
         bm = this.getSystemService(BATTERY_SERVICE) as BatteryManager
@@ -62,7 +64,44 @@ class MainActivity : AppCompatActivity() {
 
         textTime = textViewTime
         scheduleJob()
+
+
     }
+
+    private fun checkPermission(): Boolean {
+        return if (SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            val result =
+                ContextCompat.checkSelfPermission(this@MainActivity, READ_EXTERNAL_STORAGE)
+            val result1 =
+                ContextCompat.checkSelfPermission(this@MainActivity, WRITE_EXTERNAL_STORAGE)
+            result == PackageManager.PERMISSION_GRANTED && result1 == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun requestPermission() {
+        if (SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.addCategory("android.intent.category.DEFAULT")
+                intent.data = Uri.parse(String.format("package:%s", applicationContext.packageName))
+                startActivityForResult(intent, 2296)
+            } catch (e: Exception) {
+                val intent = Intent()
+                intent.action = Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
+                startActivityForResult(intent, 2296)
+            }
+        } else {
+            //below android 11
+            ActivityCompat.requestPermissions(
+                this@MainActivity,
+                arrayOf(WRITE_EXTERNAL_STORAGE),
+                80
+            )
+        }
+    }
+
 
     /**
      * On/Off StartActivityReceiver
@@ -142,6 +181,7 @@ class MainActivity : AppCompatActivity() {
      * Проверяет включены ли в настройках функции "Включать в выбранное время" и "Выключать в выбранное время"
      * Если включены, запускает таймер отсчета до этого времени и выводит текст на экран
      */
+    @SuppressLint("SetTextI18n")
     private fun isTimeFunctionsOn(imagesList: ArrayList<File>) {
         setButtonDisable()
 
@@ -152,7 +192,7 @@ class MainActivity : AppCompatActivity() {
         var isStarted = false
 
         if (sp?.getBoolean("switch_time_on", false) == true) {
-            textTime?.text = "${R.string.imagesAppear}\n ${timePickerOnHour}:${timePickerOnMinute}"
+            textTime?.text = resources.getString(R.string.imagesAppear) + " ${String.format("%02d",timePickerOnHour) }:${String.format("%02d",timePickerOnMinute)}"
             timerOn = object : CountDownTimer(1000, 1000) {
                 override fun onTick(p0: Long) {
                     Log.e(
@@ -175,8 +215,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (sp?.getBoolean("switch_time_off", false) == true) {
+            if(sp?.getBoolean("switch_time_on", false) == true){
             textTime?.text =
-                "${textTime?.text}\n ${R.string.imagesDisappear} ${timePickerOffHour}:${timePickerOffMinute}"
+                "${textTime?.text}\n" + resources.getString(R.string.imagesDisappear) + " ${String.format("%02d",timePickerOffHour)}:${String.format("%02d",timePickerOffMinute)}"
+            }
             timerOff = object : CountDownTimer(1000, 1000) {
                 override fun onTick(p0: Long) {
                     if (timePickerOffHour == currentHour() && timePickerOffMinute == currentMinute() && isStarted) {
@@ -275,64 +317,6 @@ class MainActivity : AppCompatActivity() {
                 R.string.noFiles,
                 Toast.LENGTH_SHORT
             ).show()
-        }
-    }
-
-
-    private fun checkPermission() {
-        if (!Utils.isPermissionGranted(this)) {
-            AlertDialog.Builder(this)
-                .setTitle("All files permission")
-                .setMessage("We need all file permissions")
-                .setPositiveButton("Allow"
-                ) { dialog, which ->
-                    takePermission()
-                }
-                .setNegativeButton("Deny") { dialog, which ->
-                }
-                .setIcon(android.R.drawable.ic_dialog_alert)
-                .show()
-        } else {
-            //Toast.makeText(this, "Permission Already granted", Toast.LENGTH_LONG).show()
-        }
-    }
-
-
-    private fun takePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) run {
-            try {
-                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                intent.addCategory("android.intent.category.DEFAULT")
-                val uri = Uri.fromParts("package", packageName, null)
-                intent.setData(uri)
-                startActivityForResult(intent, 101)
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-                intent.setAction(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                startActivityForResult(intent, 101)
-            }
-        } else {
-            val permissions = arrayOf(
-                android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-            )
-            ActivityCompat.requestPermissions(this, permissions, 101)
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (grantResults.isNotEmpty() && requestCode == 101) {
-            val readExt = grantResults[0] == PackageManager.PERMISSION_GRANTED
-            if (!readExt) {
-                takePermission()
-            }
         }
     }
 
