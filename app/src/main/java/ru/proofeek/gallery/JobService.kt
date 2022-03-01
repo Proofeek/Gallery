@@ -14,7 +14,6 @@ class JobService : JobService() {
 
     var sp: SharedPreferences? = null
     private var jobCancelled = false
-    //private var bbBool = false
     var bm: BatteryManager? = null
     override fun onStartJob(params: JobParameters): Boolean {
         Log.d(TAG, "Job started")
@@ -24,12 +23,14 @@ class JobService : JobService() {
         return true
     }
 
+    /**
+     * Запускает MainActivity, если устройство заряжается и приложение закрыто
+     */
     private fun doBackgroundWork(params: JobParameters) {
         Thread(Runnable {
-            Log.e(TAG, "NACHALOS")
             if(bm!!.isCharging && !sp!!.getBoolean("bBool",false) && !sp!!.getBoolean("active",false)){
                 sp!!.edit().putBoolean("bBool", true).apply()
-                Log.e(TAG, "Intent")
+                //Log.e(TAG, "Intent")
                 val intent = Intent(this, MainActivity::class.java)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(intent)
@@ -37,10 +38,9 @@ class JobService : JobService() {
             if(!bm!!.isCharging){
                 sp!!.edit().putBoolean("bBool", false).apply()
             }
-            Log.e("bBool: ", sp!!.getBoolean("bBool",false).toString())
-            Log.e("isCharhing: ", bm!!.isCharging.toString())
+            //Log.e("bBool: ", sp!!.getBoolean("bBool",false).toString())
+            //Log.e("isCharhing: ", bm!!.isCharging.toString())
                 jobFinished(params, true)
-                //MainActivity.isCharhed = true
         }).start()
     }
 
@@ -51,6 +51,6 @@ class JobService : JobService() {
     }
 
     companion object {
-        private const val TAG = "ExampleJobService"
+        private const val TAG = "JobService"
     }
 }

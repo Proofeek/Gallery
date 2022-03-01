@@ -15,7 +15,6 @@ import android.os.Bundle
 import android.os.CountDownTimer
 import android.provider.Settings
 import android.util.Log
-import android.view.View
 import android.webkit.MimeTypeMap
 import android.widget.TextView
 import android.widget.Toast
@@ -37,7 +36,7 @@ class MainActivity : AppCompatActivity() {
     val TAG = "MainActivity"
 
     lateinit var binding: ActivityMainBinding
-    var timerImgs: CountDownTimer? = null
+    var timerImages: CountDownTimer? = null
     var timerOn: CountDownTimer? = null
     var timerOff: CountDownTimer? = null
 
@@ -48,42 +47,29 @@ class MainActivity : AppCompatActivity() {
     var sp: SharedPreferences? = null
     var bm: BatteryManager? = null
 
-    companion object {
-        var isCharhed = false
-    }
-
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-
         supportActionBar?.hide()
         checkPermission()
-/*
-        supportFragmentManager
-            .beginTransaction()
-            .replace(R.id.main_fragment, HomeFragment() )
-            .commit()
-*/
+
         sp = PreferenceManager.getDefaultSharedPreferences(this)
         bm = this.getSystemService(BATTERY_SERVICE) as BatteryManager
         time = (sp?.getInt("bar_value", 10))!!.toLong() * 1000
 
-
-        //sp!!.edit().putBoolean("bBool", false).apply()
         textTime = textViewTime
-        //if (!isCharhed)
-            scheduleJob()
-
-        //val sp = PreferenceManager.getDefaultSharedPreferences(this)
-        //Log.e("KOKOKOKOKOK:LO:O:  ", sp.getInt("bar_value",10).toString())
+        scheduleJob()
     }
 
-
-    fun startActivityRecieverSwitch(switchOn: Boolean) {
+    /**
+     * On/Off StartActivityReceiver
+     *
+     * Если [switchOn] true, то [StartActivityReceiver] станет активным.
+     */
+    fun startActivityReceiverSwitch(switchOn: Boolean) {
         val pm: PackageManager = this@MainActivity.packageManager
         val componentName = ComponentName(this@MainActivity, StartActivityReceiver::class.java)
         if (switchOn) {
@@ -99,8 +85,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-    fun scheduleJob() {
+    /**
+     * Создаёт Job Scheduler ([JobService])
+     */
+    private fun scheduleJob() {
         val componentName = ComponentName(this, JobService::class.java)
         val info = JobInfo.Builder(123, componentName)
             .setRequiresCharging(true)
@@ -126,31 +114,45 @@ class MainActivity : AppCompatActivity() {
         return navController.navigateUp() || super.onSupportNavigateUp()
     }
 
-    fun setButtonEnabled(bool: Boolean) {
-        binding.mainFragment.buttonIm.isEnabled = bool
-        binding.mainFragment.buttonIm.isClickable = bool
+    /**
+     * Выключает кнопку "выбрать папку"
+     */
+    private fun setButtonDisable() {
+        binding.mainFragment.buttonIm.isEnabled = false
+        binding.mainFragment.buttonIm.isClickable = false
     }
 
+    /**
+     * @return текущий час
+     */
     fun currentHour(): Int {
         rightNow = Calendar.getInstance()
         return rightNow.get(Calendar.HOUR_OF_DAY)
     }
 
+    /**
+     * @return текущую минуту
+     */
     fun currentMinute(): Int {
         rightNow = Calendar.getInstance()
         return rightNow.get(Calendar.MINUTE)
     }
 
-    fun isTimeFunctionsOn(imagesList: ArrayList<File>) {
-        setButtonEnabled(false)
+    /**
+     * Проверяет включены ли в настройках функции "Включать в выбранное время" и "Выключать в выбранное время"
+     * Если включены, запускает таймер отсчета до этого времени и выводит текст на экран
+     */
+    private fun isTimeFunctionsOn(imagesList: ArrayList<File>) {
+        setButtonDisable()
 
         val timePickerOnHour = sp?.getInt("timePickerHourOn", 12)
         val timePickerOnMinute = sp?.getInt("timePickerMinuteOn", 0)
         val timePickerOffHour = sp?.getInt("timePickerHourOff", 16)
         val timePickerOffMinute = sp?.getInt("timePickerMinuteOff", 0)
         var isStarted = false
+
         if (sp?.getBoolean("switch_time_on", false) == true) {
-            textTime?.text = "Изображения появятся\nв ${timePickerOnHour}:${timePickerOnMinute}"
+            textTime?.text = "${R.string.imagesAppear}\n ${timePickerOnHour}:${timePickerOnMinute}"
             timerOn = object : CountDownTimer(1000, 1000) {
                 override fun onTick(p0: Long) {
                     Log.e(
@@ -174,16 +176,15 @@ class MainActivity : AppCompatActivity() {
 
         if (sp?.getBoolean("switch_time_off", false) == true) {
             textTime?.text =
-                "${textTime?.text}\nи исчезнут в ${timePickerOffHour}:${timePickerOffMinute}"
+                "${textTime?.text}\n ${R.string.imagesDisappear} ${timePickerOffHour}:${timePickerOffMinute}"
             timerOff = object : CountDownTimer(1000, 1000) {
                 override fun onTick(p0: Long) {
                     if (timePickerOffHour == currentHour() && timePickerOffMinute == currentMinute() && isStarted) {
-                        timerImgs?.cancel()
+                        timerImages?.cancel()
                         recreateActivity()
                         this.cancel()
                     }
                 }
-
                 override fun onFinish() {
                     this.start()
                 }
@@ -196,17 +197,18 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    /**
+     * Выводит в ImageView получаемый [imagesList] с периодичностью, заданной в настройках
+     */
     fun imagesToScreen(imagesList: ArrayList<File>) {
         textTime?.text = ""
 
         var step = 0
-        Log.e("СЕКУНДЫ", (time / 1000).toString())
-        timerImgs?.cancel()
-        timerImgs = object : CountDownTimer(time, time) {
+        timerImages?.cancel()
+        timerImages = object : CountDownTimer(time, time) {
             override fun onTick(p0: Long) {
                 val bitmap = BitmapFactory.decodeFile(imagesList[step].path)
                 binding.mainFragment.imageView.setImageBitmap(bitmap)
-                Log.e("Number", step.toString())
                 if (step + 1 >= imagesList.size) step = 0 else step++
             }
 
@@ -215,34 +217,36 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
 
-
-        Log.e("LOLOLP", "p1")
     }
 
 
     val dirRequest = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let {
-            // call this to persist permission across decice reboots
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            // do your stuff
             val fullpath = File(uri.lastPathSegment?.replace("raw:", ""))
-            Log.w("fullpath", "" + fullpath)
+            Log.w(TAG, "fullpath: " + fullpath)
             imageReaderNew(fullpath)
         }
     }
 
-    fun getMimeType(url: String?): String? {
+
+    /**
+     * @return тип файла по его [пути][url]
+     */
+    private fun getMimeType(url: String?): String? {
         var type: String? = null
         val extension = MimeTypeMap.getFileExtensionFromUrl(url)
         if (extension != null) {
             type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
         }
-//Log.e("TYPE", type.toString())
         return type
     }
 
+    /**
+     * Загружает все изображения из папки по [пути][root] в [fileList].
+     * Запускает [isTimeFunctionsOn]
+     */
     private fun imageReaderNew(root: File) {
-        Log.e("GG", "TI ZDEC")
         val fileList: ArrayList<File> = ArrayList()
         val listAllFiles = root.listFiles()
 
@@ -256,15 +260,21 @@ class MainActivity : AppCompatActivity() {
                     fileList.add(currentFile.absoluteFile)
                 }
             }
-            Log.w("fileList", "" + fileList.size)
+            /*
             Toast.makeText(
                 this,
-                "Выбрано ${fileList.size.toString()} изображений",
+                "Выбрано ${fileList.size} изображений",
                 Toast.LENGTH_SHORT
             ).show()
+             */
             isTimeFunctionsOn(fileList)
         } else {
-            Log.e("AGA", "NO FILES")
+            Log.e(TAG, "NO FILES")
+            Toast.makeText(
+                this,
+                R.string.noFiles,
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -274,12 +284,12 @@ class MainActivity : AppCompatActivity() {
             AlertDialog.Builder(this)
                 .setTitle("All files permission")
                 .setMessage("We need all file permissions")
-                .setPositiveButton("Allow",
-                    DialogInterface.OnClickListener { dialog, which ->
-                        takePermission()
-                    })
-                .setNegativeButton("Deny", DialogInterface.OnClickListener { dialog, which ->
-                })
+                .setPositiveButton("Allow"
+                ) { dialog, which ->
+                    takePermission()
+                }
+                .setNegativeButton("Deny") { dialog, which ->
+                }
                 .setIcon(android.R.drawable.ic_dialog_alert)
                 .show()
         } else {
@@ -288,7 +298,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    fun takePermission() {
+    private fun takePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) run {
             try {
                 val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
@@ -326,6 +336,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Меняет булевую переменную "active" в SharedPreferences на true
+     */
     override fun onStart() {
         sp!!.edit().putBoolean("active", true).apply()
         //cancelJob()
@@ -333,6 +346,10 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
     }
 
+    /**
+     * Меняет булевую переменную "active" в SharedPreferences на false.
+     * Запускает [scheduleJob]
+     */
     override fun onStop() {
         sp!!.edit().putBoolean("active", false).apply()
 
